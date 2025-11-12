@@ -10,12 +10,13 @@ type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 export default function LoginScreen({ navigation }: Props) {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
 
   const handleLogin = async () => {
     try {
-      await login(email.trim());
+      await login(email.trim(), senha);
     } catch (e: any) {
-      Alert.alert("Erro ao entrar", e.message || "Verifique seu e-mail.");
+      Alert.alert("Erro ao entrar", e.message);
     }
   };
 
@@ -27,6 +28,7 @@ export default function LoginScreen({ navigation }: Props) {
         resizeMode="contain"
       />
       <Text style={globalStyles.title}>Bem-vindo ao MentIA</Text>
+
       <TextInput
         style={[globalStyles.input, { width: "100%" }]}
         placeholder="E-mail"
@@ -35,9 +37,19 @@ export default function LoginScreen({ navigation }: Props) {
         keyboardType="email-address"
         autoCapitalize="none"
       />
+
+      <TextInput
+        style={[globalStyles.input, { width: "100%" }]}
+        placeholder="Senha"
+        secureTextEntry
+        onChangeText={setSenha}
+        value={senha}
+      />
+
       <View style={{ width: "100%", marginBottom: 8 }}>
         <Button title="Entrar" color="#201f7d" onPress={handleLogin} />
       </View>
+
       <Text onPress={() => navigation.navigate("Register")} style={{ color: "#201f7d", marginTop: 8 }}>
         Não tem conta? Cadastre-se
       </Text>

@@ -1,58 +1,91 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { auth, db } from "../firebase/firebaseConfig";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+  User as FirebaseUser,
+} from "firebase/auth";
+import { ref, set, get } from "firebase/database";
 
-export type User = {
+export type UserProfile = {
   nome: string;
   email: string;
   area: string;
 };
 
 type AuthContextType = {
-  user: User | null;
-  register: (user: User) => Promise<void>;
-  login: (email: string) => Promise<void>;
+  user: UserProfile | null;
+  loading: boolean;
+  register: (data: UserProfile, senha: string) => Promise<void>;
+  login: (email: string, senha: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (user: User) => Promise<void>;
+  updateProfile: (data: UserProfile) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
+  // Carrega perfil ao abrir app
   useEffect(() => {
-    const loadUser = async () => {
-      const data = await AsyncStorage.getItem("mentia_user");
-      if (data) setUser(JSON.parse(data));
-    };
-    loadUser();
+    return onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        await loadUserProfile(firebaseUser);
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
   }, []);
 
-  const register = async (newUser: User) => {
-    await AsyncStorage.setItem("mentia_user", JSON.stringify(newUser));
-    setUser(newUser);
+  // Lê o perfil no Realtime DB
+  const loadUserProfile = async (firebaseUser: FirebaseUser) => {
+    const userRef = ref(db, `users/${firebaseUser.uid}`);
+    const snap = await get(userRef);
+    if (snap.exists()) {
+      setUser(snap.val());
+    }
   };
 
-  const login = async (email: string) => {
-    const data = await AsyncStorage.getItem("mentia_user");
-    if (!data) throw new Error("Usuário não cadastrado.");
-    const parsed: User = JSON.parse(data);
-    if (parsed.email !== email) throw new Error("E-mail não corresponde ao usuário cadastrado.");
-    setUser(parsed);
+  const register = async (data: UserProfile, senha: string) => {
+    const cred = await createUserWithEmailAndPassword(auth, data.email, senha);
+    await set(ref(db, `users/${cred.user.uid}`), data);
+    setUser(data);
+  };
+
+  const login = async (email: string, senha: string) => {
+    const cred = await signInWithEmailAndPassword(auth, email, senha);
+    await loadUserProfile(cred.user);
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem("mentia_user");
+    await signOut(auth);
     setUser(null);
   };
 
-  const updateProfile = async (updated: User) => {
-    await AsyncStorage.setItem("mentia_user", JSON.stringify(updated));
-    setUser(updated);
+  const updateProfile = async (data: UserProfile) => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return;
+
+    await set(ref(db, `users/${firebaseUser.uid}`), data);
+    setUser(data);
   };
 
   return (
-    <AuthContext.Provider value={{ user, register, login, logout, updateProfile }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        register,
+        login,
+        logout,
+        updateProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
