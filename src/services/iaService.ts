@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const OPENROUTER_API_KEY = "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";
+const OPENROUTER_API_KEY = "xxxxxx";
 
 export async function getIARecommendations(pergunta: string, area: string, nome: string) {
   const prompt = `
